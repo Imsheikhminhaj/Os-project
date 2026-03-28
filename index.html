@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Page Replacement Algorithm Visualizer</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg:        #060c18;
+      --surface:   #0d1627;
+      --surface2:  #111e35;
+      --border:    rgba(255,255,255,0.06);
+      --accent:    #facc15;
+      --accent2:   #38bdf8;
+      --accent3:   #4ade80;
+      --danger:    #f87171;
+      --text:      #e2eaf6;
+      --muted:     #8da4c0;
+      --mono:      'Space Mono', monospace;
+      --sans:      'DM Sans', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(56,189,248,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,189,248,0.025) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container { position: relative; z-index: 1; max-width: 1100px; }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+    }
+    header .tag {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      background: rgba(250,204,21,0.08);
+      border: 1px solid rgba(250,204,21,0.2);
+      border-radius: 4px;
+      padding: 3px 10px;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+    header h1 {
+      font-family: var(--mono);
+      font-size: clamp(1.6rem, 4vw, 2.8rem);
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+    header h1 span { color: var(--accent); }
+    header p {
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.6rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+    }
+    .card-title {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1.2rem;
+    }
+
+    /* ── Inputs ── */
+    .form-label {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
+    }
+    .form-control {
+      background: var(--surface2);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.92rem;
+      padding: 0.55rem 0.85rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-control::placeholder { color: rgba(255,255,255,0.3); }
+    .form-control:focus {
+      background: var(--surface2);
+      color: #fff;
+      border-color: rgba(250,204,21,0.4);
+      box-shadow: 0 0 0 3px rgba(250,204,21,0.07);
+      outline: none;
+    }
+    .helper-text {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+
+    /* ── Buttons ── */
+    .btn-run {
+      background: var(--accent);
+      color: #0b0e14;
+      border: none;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 0.6rem 1.8rem;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-run:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(250,204,21,0.28);
+    }
+    .btn-run:active { transform: translateY(0); }
+
+    .btn-util {
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      padding: 0.55rem 0.9rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-util:hover { color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+    /* ── Tabs ── */
+    .algo-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 1.2rem;
+      border: none;
+      flex-wrap: wrap;
+    }
+    .algo-tab {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      padding: 0.5rem 1.2rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .algo-tab:hover { color: var(--text); border-color: rgba(255,255,255,0.12); }
+    .algo-tab.active {
+      background: rgba(250,204,21,0.1);
+      border-color: rgba(250,204,21,0.35);
+      color: var(--accent);
+    }
+    .algo-tab .sub {
+      display: block;
+      font-size: 0.62rem;
+      opacity: 0.6;
+      font-family: var(--sans);
+      letter-spacing: 0;
+      margin-top: 1px;
+    }
+
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* ── Fault badge ── */
+    .fault-badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      background: rgba(248,113,113,0.12);
+      color: var(--danger);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 5px;
+      padding: 2px 9px;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+
+    /* ── Table ── */
+    .table-wrapper { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+    }
+    thead tr {
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    thead th {
+      color: var(--muted);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.6rem 0.9rem;
+      text-align: center;
+      font-weight: 400;
+    }
+    tbody td {
+      padding: 0.5rem 0.9rem;
+      text-align: center;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      color: var(--text);
+      transition: background 0.1s;
+    }
+    .row-fault td { background: rgba(248,113,113,0.07); }
+    .row-hit td   { background: rgba(74,222,128,0.04); }
+    .row-fault td:first-child { border-left: 2px solid rgba(248,113,113,0.5); }
+    .row-hit td:first-child   { border-left: 2px solid rgba(74,222,128,0.25); }
+
+    .cell-replaced {
+      color: var(--accent) !important;
+      font-weight: 700;
+      position: relative;
+    }
+    .cell-replaced::after {
+      content: '▲';
+      font-size: 0.5rem;
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      color: var(--accent);
+      opacity: 0.6;
+    }
+
+    .fault-yes { color: var(--danger); font-weight: 700; }
+    .fault-no  { color: var(--accent3); }
+
+    /* ── Comparison grid ── */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .compare-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      text-align: center;
+    }
+    .compare-card .algo-name {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 0.3rem;
+    }
+    .compare-card .fault-num {
+      font-family: var(--mono);
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .compare-card .fault-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .compare-card.best { border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.04); }
+    .compare-card.best .fault-num { color: var(--accent3); }
+    .compare-card:not(.best) .fault-num { color: var(--text); }
+
+    /* ── Error message ── */
+    #errorMsg {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      color: var(--danger);
+      margin-top: 0.5rem;
+      min-height: 1.2em;
+    }
+
+    /* ── Canvas ── */
+    #faultChart { max-height: 260px; }
+
+    /* ── Spacing helpers ── */
+    .mb-card { margin-bottom: 1.2rem; }
+    .section-gap { margin-bottom: 2rem; }
+
+    @media (max-width: 600px) {
+      .compare-grid { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+      .compare-card .fault-num { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container py-3 px-3 mx-auto">
+
+    <header>
+      <div class="tag">OS Memory Management</div>
+      <h1>Page <span>Replacement</span> Visualizer</h1>
+      <p>Step-by-step simulation of FIFO, LRU, and Optimal algorithms with fault comparison.</p>
+    </header>
+
+    <!-- Settings Card -->
+    <div class="card mb-card section-gap">
+      <div class="card-title">⚙ Simulation Settings</div>
+      <div class="row g-3 align-items-start">
+        <div class="col-md-3">
+          <label for="framesInput" class="form-label">Number of Frames</label>
+          <input id="framesInput" class="form-control" type="number" min="1" max="20" value="3" />
+          <div class="helper-text">Range: 1 – 20 frames</div>
+        </div>
+        <div class="col-md-9">
+          <label for="pagesInput" class="form-label">Page Reference String</label>
+          <div class="d-flex gap-2">
+            <input id="pagesInput" class="form-control flex-grow-1" type="text"
+              placeholder="e.g. 7 0 1 2 0 3 0 4 2 3 0 3 2"
+              value="7 0 1 2 0 3 0 4 2 3 0 3 2" />
+            <button id="copyRef" class="btn-util">Copy</button>
+            <button id="clearRef" class="btn-util">Clear</button>
+          </div>
+          <div class="helper-text">Space or comma separated. Compact digits (e.g. <code style="color:var(--accent)">70123</code>) also accepted.</div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div id="errorMsg" role="alert" aria-live="polite"></div>
+        <button id="runBtn" class="btn-run">▶ Run Simulation</button>
+      </div>
+    </div>
+
+    <!-- Results (hidden until run) -->
+    <div id="results" style="display:none">
+
+      <!-- Fault summary cards -->
+      <div class="compare-grid mb-card" id="compareGrid">
+        <div class="compare-card" id="cc-fifo">
+          <div class="algo-name">FIFO</div>
+          <div class="fault-num" id="cn-fifo">—</div>
+          <div class="fault-label">page faults</div>
+        </div>
+        <div class="compare-card" id="cc-lru">
+          <div class="algo-name">LRU</div>
+          <div class="fault-num" id="cn-lru">—</div>
+          <div class="fault-label">page faults</div>
+        </div>
+        <div class="compare-card" id="cc-opt">
+          <div class="algo-name">Optimal</div>
+          <div class="fault-num" id="cn-opt">—</div>
+          <div class="fault-label">page faults</div>
+        </div>
+      </div>
+
+      <!-- Algo Tabs -->
+      <div class="algo-tabs" role="tablist">
+        <button class="algo-tab active" data-tab="fifo" role="tab">FIFO<span class="sub">First In First Out</span></button>
+        <button class="algo-tab" data-tab="lru" role="tab">LRU<span class="sub">Least Recently Used</span></button>
+        <button class="algo-tab" data-tab="opt" role="tab">Optimal<span class="sub">MIN / Clairvoyant</span></button>
+      </div>
+
+      <div class="card mb-card section-gap">
+        <!-- FIFO -->
+        <div class="tab-pane active" id="pane-fifo">
+          <div class="card-title">FIFO Simulation <span class="fault-badge" id="fb-fifo"></span></div>
+          <div class="table-wrapper"><table id="fifoTable"></table></div>
+        </div>
+        <!-- LRU -->
+        <div class="tab-pane" id="pane-lru">
+          <div class="card-title">LRU Simulation <span class="fault-badge" id="fb-lru"></span></div>
+          <div class="table-wrapper"><table id="lruTable"></table></div>
+        </div>
+        <!-- Optimal -->
+        <div class="tab-pane" id="pane-opt">
+          <div class="card-title">Optimal Simulation <span class="fault-badge" id="fb-opt"></span></div>
+          <div class="table-wrapper"><table id="optTable"></table></div>
+        </div>
+      </div>
+
+      <!-- Chart -->
+      <div class="card">
+        <div class="card-title">📊 Page Fault Comparison</div>
+        <canvas id="faultChart" aria-label="Bar chart comparing page faults across algorithms" role="img"></canvas>
+      </div>
+
+    </div><!-- /results -->
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+    const framesInput = document.getElementById('framesInput');
+    const pagesInput  = document.getElementById('pagesInput');
+    const runBtn      = document.getElementById('runBtn');
+    const copyRefBtn  = document.getElementById('copyRef');
+    const clearRefBtn = document.getElementById('clearRef');
+    const errorMsg    = document.getElementById('errorMsg');
+    const resultsDiv  = document.getElementById('results');
+
+    // ── Utility ───────────────────────────────────────────────────────────────
+    // FIX 1: Single definition of parsePages (removed duplicate, fixed empty-string → 0 bug)
+    function parsePages(raw) {
+      if (!raw || typeof raw !== 'string') return [];
+      const trimmed = raw.trim();
+      // If separators present, split on them
+      if (/[,;\s]/.test(trimmed)) {
+        return trimmed
+          .split(/[,;\s]+/)
+          .filter(s => s !== '')          // FIX 5: remove empty tokens before Number()
+          .map(Number)
+          .filter(n => Number.isFinite(n) && !Number.isNaN(n));
+      }
+      // Compact all-digits string: each char is a page
+      if (/^\d+$/.test(trimmed)) {
+        return trimmed.split('').map(Number);
+      }
+      // Mixed: split on non-digit runs, drop empties
+      return trimmed
+        .split(/\D+/)
+        .filter(s => s !== '')            // FIX 5: remove empty tokens
+        .map(Number)
+        .filter(n => Number.isFinite(n) && !Number.isNaN(n));
+    }
+
+    // FIX 1: Single definition of showError
+    function showError(msg) {
+      errorMsg.textContent = msg || '';
+    }
+
+    // ── Simulators ────────────────────────────────────────────────────────────
+    function simulateFIFO(pages, fc) {
+      const frames = new Array(fc).fill(null);
+      let ptr = 0, faults = 0;
+      const steps = [];
+
+      pages.forEach((page, i) => {
+        const hit = frames.includes(page);
+        let replacedIndex = -1;
+
+        if (!hit) {
+          faults++;
+          const empty = frames.indexOf(null);
+          if (empty !== -1) {
+            frames[empty] = page;
+            replacedIndex = empty;
+          } else {
+            // FIX 3: capture ptr BEFORE incrementing so replacedIndex is correct
+            replacedIndex = ptr;
+            frames[ptr] = page;
+            ptr = (ptr + 1) % fc;
+          }
+        }
+
+        steps.push({ step: i + 1, page, frames: [...frames], fault: !hit, replacedIndex });
+      });
+
+      return { steps, faults };
+    }
+
+    function simulateLRU(pages, fc) {
+      const frames   = new Array(fc).fill(null);
+      const lastUsed = new Array(fc).fill(-1);
+      let faults = 0;
+      const steps = [];
+
+      pages.forEach((page, idx) => {
+        const hitIdx = frames.indexOf(page);
+        const hit    = hitIdx !== -1;
+        let replacedIndex = -1;
+
+        if (hit) {
+          lastUsed[hitIdx] = idx;
+        } else {
+          faults++;
+          const empty = frames.indexOf(null);
+          if (empty !== -1) {
+            frames[empty]   = page;
+            lastUsed[empty] = idx;
+            replacedIndex   = empty;
+          } else {
+            let lru = 0;
+            for (let j = 1; j < fc; j++) {
+              if (lastUsed[j] < lastUsed[lru]) lru = j;
+            }
+            frames[lru]   = page;
+            lastUsed[lru] = idx;
+            replacedIndex = lru;
+          }
+        }
+
+        steps.push({ step: idx + 1, page, frames: [...frames], fault: !hit, replacedIndex });
+      });
+
+      return { steps, faults };
+    }
+
+    function simulateOptimal(pages, fc) {
+      const frames = new Array(fc).fill(null);
+      let faults = 0;
+      const steps = [];
+
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        const hit  = frames.includes(page);
+        let replacedIndex = -1;
+
+        if (!hit) {
+          faults++;
+          const empty = frames.indexOf(null);
+          if (empty !== -1) {
+            frames[empty] = page;
+            replacedIndex = empty;
+          } else {
+            let replace = 0, farthest = -1;
+            for (let j = 0; j < fc; j++) {
+              const next = pages.indexOf(frames[j], i + 1);
+              const dist = next === -1 ? Infinity : next;
+              if (dist > farthest) { farthest = dist; replace = j; }
+            }
+            frames[replace] = page;
+            replacedIndex   = replace;
+          }
+        }
+
+        steps.push({ step: i + 1, page, frames: [...frames], fault: !hit, replacedIndex });
+      }
+
+      return { steps, faults };
+    }
+
+    // ── Table Renderer ────────────────────────────────────────────────────────
+    function renderTable(tableEl, result, fc) {
+      // Header
+      let html = '<thead><tr>'
+        + '<th>Step</th><th>Page</th>';
+      for (let i = 0; i < fc; i++) {
+        html += `<th>F${i + 1}</th>`;
+      }
+      html += '<th>Fault?</th></tr></thead><tbody>';
+
+      // Rows
+      result.steps.forEach(row => {
+        const rowClass = row.fault ? 'row-fault' : 'row-hit';
+        html += `<tr class="${rowClass}">`;
+        html += `<td>${row.step}</td>`;
+        html += `<td><strong>${row.page}</strong></td>`;
+
+        row.frames.forEach((f, idx) => {
+          const cls = idx === row.replacedIndex ? 'cell-replaced' : '';
+          html += `<td class="${cls}">${f === null ? '—' : f}</td>`;
+        });
+
+        const faultLabel = row.fault
+          ? '<span class="fault-yes">✕ Yes</span>'
+          : '<span class="fault-no">✓ No</span>';
+        html += `<td>${faultLabel}</td>`;
+        html += '</tr>';
+      });
+
+      html += '</tbody>';
+      tableEl.innerHTML = html;
+    }
+
+    // ── Chart ─────────────────────────────────────────────────────────────────
+    let faultChart = null;
+    function updateChart(fifo, lru, opt) {
+      const ctx = document.getElementById('faultChart');
+      if (faultChart) { faultChart.destroy(); faultChart = null; }
+
+      faultChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['FIFO', 'LRU', 'Optimal'],
+          datasets: [{
+            label: 'Page Faults',
+            data: [fifo, lru, opt],
+            backgroundColor: [
+              'rgba(250,204,21,0.85)',
+              'rgba(56,189,248,0.85)',
+              'rgba(74,222,128,0.85)'
+            ],
+            borderColor: [
+              'rgba(250,204,21,1)',
+              'rgba(56,189,248,1)',
+              'rgba(74,222,128,1)'
+            ],
+            borderWidth: 1,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#111e35',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              titleColor: '#e2eaf6',
+              bodyColor: '#8da4c0',
+              callbacks: {
+                label: ctx => ` ${ctx.parsed.y} page faults`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8da4c0', font: { family: "'Space Mono', monospace", size: 11 } },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#8da4c0', stepSize: 1, font: { family: "'Space Mono', monospace", size: 11 } },
+              grid: { color: 'rgba(255,255,255,0.04)' }
+            }
+          }
+        }
+      });
+    }
+
+    // ── Summary cards ─────────────────────────────────────────────────────────
+    function updateSummaryCards(fifoF, lruF, optF) {
+      const min = Math.min(fifoF, lruF, optF);
+      document.getElementById('cn-fifo').textContent = fifoF;
+      document.getElementById('cn-lru').textContent  = lruF;
+      document.getElementById('cn-opt').textContent  = optF;
+
+      ['fifo','lru','opt'].forEach(id => {
+        const el = document.getElementById(`cc-${id}`);
+        el.classList.remove('best');
+      });
+      const map = { fifo: fifoF, lru: lruF, opt: optF };
+      Object.entries(map).forEach(([id, val]) => {
+        if (val === min) document.getElementById(`cc-${id}`).classList.add('best');
+      });
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.algo-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.algo-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById(`pane-${btn.dataset.tab}`).classList.add('active');
+      });
+    });
+
+    // ── Utility buttons ───────────────────────────────────────────────────────
+    copyRefBtn.addEventListener('click', () => {
+      navigator.clipboard?.writeText(pagesInput.value || '').then(() => {
+        copyRefBtn.textContent = 'Copied!';
+        setTimeout(() => { copyRefBtn.textContent = 'Copy'; }, 900);
+      }).catch(() => {});
+    });
+    clearRefBtn.addEventListener('click', () => { pagesInput.value = ''; });
+
+    // ── Run ───────────────────────────────────────────────────────────────────
+    runBtn.addEventListener('click', () => {
+      showError('');
+
+      const fc = parseInt(framesInput.value, 10);
+      if (!Number.isFinite(fc) || fc < 1 || fc > 20) {
+        showError('Frames must be between 1 and 20.');
+        return;
+      }
+
+      const pages = parsePages(pagesInput.value);
+      if (pages.length === 0) {
+        showError('Enter at least one valid page number.');
+        return;
+      }
+
+      const fifo = simulateFIFO(pages, fc);
+      const lru  = simulateLRU(pages, fc);
+      const opt  = simulateOptimal(pages, fc);
+
+      renderTable(document.getElementById('fifoTable'), fifo, fc);
+      renderTable(document.getElementById('lruTable'),  lru,  fc);
+      renderTable(document.getElementById('optTable'),  opt,  fc);
+
+      document.getElementById('fb-fifo').textContent = `${fifo.faults} faults`;
+      document.getElementById('fb-lru').textContent  = `${lru.faults} faults`;
+      document.getElementById('fb-opt').textContent  = `${opt.faults} faults`;
+
+      updateSummaryCards(fifo.faults, lru.faults, opt.faults);
+      updateChart(fifo.faults, lru.faults, opt.faults);
+
+      resultsDiv.style.display = 'block';
+    });
+
+    // Run on load with default values
+    window.addEventListener('load', () => runBtn.click());
+  </script>
+</body>
+</html>
